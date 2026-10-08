@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /login.html
+Disallow: /register.html
+Disallow: /checkout.html
+Disallow: /*.php$
+Disallow: /config
+Sitemap: https://allinoneabroad.com/sitemap.xml

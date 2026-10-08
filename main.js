@@ -418,5 +418,5 @@ async function handleLogout() {
       body: JSON.stringify({ action: 'logout' })
     });
   } catch (err) {}
-  window.location.href = 'index.html';
+  window.location.href = '/';
 }
