@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Shop Luggage, Kitchen &amp; Home Appliances | ALL IN ONE ABROAD</title>
-  <meta name="description" content="Browse trolley bags, kitchen essentials and home appliances. Everything you need to pack for life abroad, with delivery in Kathmandu."/>
-  <meta name="robots" content="index,follow,max-image-preview:large"/>
-  <link rel="canonical" href="https://allinoneabroad.com/shop.html"/>
+  <title>My Wishlist | ALL IN ONE ABROAD</title>
+  <meta name="description" content="Your saved products at ALL IN ONE ABROAD."/>
+  <meta name="robots" content="noindex,follow"/>
+  <link rel="canonical" href="https://allinoneabroad.com/wishlist.html"/>
   <meta name="theme-color" content="#ffffff"/>
   <link rel="icon" href="/favicon.ico" sizes="any"/>
   <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png"/>
@@ -14,13 +14,13 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
   <meta property="og:type" content="website"/>
   <meta property="og:site_name" content="ALL IN ONE ABROAD"/>
-  <meta property="og:title" content="Shop Luggage, Kitchen &amp; Home Appliances | ALL IN ONE ABROAD"/>
-  <meta property="og:description" content="Browse trolley bags, kitchen essentials and home appliances. Everything you need to pack for life abroad, with delivery in Kathmandu."/>
-  <meta property="og:url" content="https://allinoneabroad.com/shop.html"/>
+  <meta property="og:title" content="My Wishlist | ALL IN ONE ABROAD"/>
+  <meta property="og:description" content="Your saved products at ALL IN ONE ABROAD."/>
+  <meta property="og:url" content="https://allinoneabroad.com/wishlist.html"/>
   <meta property="og:image" content="https://allinoneabroad.com/images/home-hero.jpg"/>
   <meta name="twitter:card" content="summary_large_image"/>
-  <meta name="twitter:title" content="Shop Luggage, Kitchen &amp; Home Appliances | ALL IN ONE ABROAD"/>
-  <meta name="twitter:description" content="Browse trolley bags, kitchen essentials and home appliances. Everything you need to pack for life abroad, with delivery in Kathmandu."/>
+  <meta name="twitter:title" content="My Wishlist | ALL IN ONE ABROAD"/>
+  <meta name="twitter:description" content="Your saved products at ALL IN ONE ABROAD."/>
   <meta name="twitter:image" content="https://allinoneabroad.com/images/home-hero.jpg"/>
   <link rel="stylesheet" href="style.css?v=23"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
@@ -58,45 +58,18 @@
 
 <div class="shop-hero">
   <div class="container">
-    <h1 id="shopTitle">All Products</h1>
-    <p id="shopDesc">Everything you need — luggage and kitchen.</p>
+    <h1>My Wishlist</h1>
+    <p id="wishCountText">Products you've saved for later.</p>
   </div>
 </div>
 
-<div class="shop-layout">
-  <aside class="shop-sidebar">
-    <div class="filter-box">
-      <div class="filter-title">Categories</div>
-      <label class="filter-opt"><input type="radio" name="cat" value="all" onchange="location.href='shop.html?cat=all'"> <span>All Products</span></label>
-      <label class="filter-opt"><input type="radio" name="cat" value="luggage" onchange="location.href='shop.html?cat=luggage'"> <span>Luggage &amp; Bags</span></label>
-      <label class="filter-opt"><input type="radio" name="cat" value="kitchen" onchange="location.href='shop.html?cat=kitchen'"> <span>Kitchen Essentials</span></label>
-      <label class="filter-opt"><input type="radio" name="cat" value="appliances" onchange="location.href='shop.html?cat=appliances'"> <span>Home Appliances</span></label>
-    </div>
-    <div class="filter-box">
-      <div class="filter-title">Price Range</div>
-      <label class="filter-opt"><input type="checkbox"> <span>Under Rs. 500</span></label>
-      <label class="filter-opt"><input type="checkbox"> <span>Rs. 500 – 1,500</span></label>
-      <label class="filter-opt"><input type="checkbox"> <span>Rs. 1,500 – 5,000</span></label>
-      <label class="filter-opt"><input type="checkbox"> <span>Above Rs. 5,000</span></label>
-    </div>
-    <div class="filter-box">
-      <div class="filter-title">Discount</div>
-      <label class="filter-opt"><input type="checkbox"> <span>40% or more</span></label>
-      <label class="filter-opt"><input type="checkbox"> <span>50% or more</span></label>
-    </div>
-  </aside>
-  <div class="shop-main">
-    <div class="sort-bar">
-      <span id="prodCount" style="font-size:13px;color:var(--gray);"></span>
-      <select id="sortSelect" onchange="renderShop()">
-        <option value="featured">Featured</option>
-        <option value="low">Price: Low to High</option>
-        <option value="high">Price: High to Low</option>
-        <option value="rated">Top Rated</option>
-      </select>
-    </div>
-    <div class="shop-grid" id="shopGrid"></div>
+<div class="container" style="padding:40px 20px;">
+  <div class="empty-state" id="wishEmpty" style="display:none;">
+    <div class="empty-icon">♡</div>
+    <p>Your wishlist is empty</p>
+    <a href="shop.html" class="btn-orange">Browse Products</a>
   </div>
+  <div class="shop-grid wish-grid" id="wishGrid"></div>
 </div>
 
 <footer class="site-footer">
@@ -128,14 +101,6 @@
 </aside>
 <div class="toast" id="toast"></div>
 <button class="back-top" id="backTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
-<script>
-  // Set active category radio on load
-  document.addEventListener('DOMContentLoaded', () => {
-    const cat = new URLSearchParams(location.search).get('cat') || 'all';
-    const radio = document.querySelector(`input[value="${cat}"]`);
-    if (radio) radio.checked = true;
-  });
-</script>
 <script src="main.js?v=14"></script>
 </body>
 </html>

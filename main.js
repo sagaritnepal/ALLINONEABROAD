@@ -2,6 +2,17 @@
    ALL IN ONE ABROAD — main.js
    ============================================= */
 
+// ─── SAFE STORAGE (localStorage throws in private mode / in-app browsers) ───
+function storageGet(key, fallback) {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) || 'null');
+    return Array.isArray(fallback) ? (Array.isArray(v) ? v : fallback) : (v ?? fallback);
+  } catch (e) { return fallback; }
+}
+function storageSet(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+}
+
 // ─── IMAGE FALLBACK ──────────────────────────
 const FALLBACK_IMG = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="100%" height="100%" fill="#f3f4f6"/><text x="50%" y="50%" font-family="Arial, sans-serif" font-size="16" fill="#9ca3af" text-anchor="middle" dominant-baseline="middle">Image unavailable</text></svg>'
@@ -69,7 +80,7 @@ async function loadBannerMessages() {
 
 // ─── POPUP BANNER (admin-editable, closeable) ─
 async function loadPopupBanner() {
-  if (sessionStorage.getItem('aiaPopupDismissed')) return;
+  try { if (sessionStorage.getItem('aiaPopupDismissed')) return; } catch (e) {}
   try {
     const res = await fetch('api.php?action=popup_banner');
     const data = await res.json();
@@ -114,16 +125,22 @@ function showPopupBanner(image, link) {
 
   function dismiss() {
     overlay.remove();
-    sessionStorage.setItem('aiaPopupDismissed', '1');
+    try { sessionStorage.setItem('aiaPopupDismissed', '1'); } catch (e) {}
   }
   closeBtn.addEventListener('click', dismiss);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) dismiss(); });
 }
 
 // ─── CART STATE ──────────────────────────────
-let cart = JSON.parse(localStorage.getItem('aiaCart') || '[]');
+let cart = storageGet('aiaCart', []).filter(i => i && typeof i.price === 'number' && i.qty > 0);
 
-function saveCart() { localStorage.setItem('aiaCart', JSON.stringify(cart)); }
+function saveCart() { storageSet('aiaCart', cart); }
+
+function addToCartById(id) {
+  const p = PRODUCTS.find(x => x.id === id);
+  if (!p) return;
+  addToCart({ id: p.id, name: p.name, price: p.price, img: p.img, cat: p.cat });
+}
 
 function addToCart(product, qty = 1) {
   const existing = cart.find(i => i.id === product.id);
@@ -221,15 +238,46 @@ function showToast(msg) {
 }
 
 // ─── WISHLIST (local) ────────────────────────
-let wishlist = JSON.parse(localStorage.getItem('aiaWish') || '[]');
-function toggleWish(id) {
-  const idx = wishlist.indexOf(id);
-  if (idx > -1) wishlist.splice(idx, 1); else wishlist.push(id);
-  localStorage.setItem('aiaWish', JSON.stringify(wishlist));
-  document.querySelectorAll(`[data-wish="${id}"]`).forEach(btn => {
-    btn.textContent = wishlist.includes(id) ? '♥' : '♡';
-    btn.style.color = wishlist.includes(id) ? '#ef4444' : '';
+let wishlist = storageGet('aiaWish', []).map(Number).filter(Boolean);
+
+function updateWishUI() {
+  document.querySelectorAll('.wish-count').forEach(el => {
+    el.textContent = wishlist.length;
+    el.style.display = wishlist.length ? '' : 'none';
   });
+  document.querySelectorAll('[data-wish]').forEach(btn => {
+    const on = wishlist.includes(Number(btn.dataset.wish));
+    btn.textContent = on ? '♥' : '♡';
+    btn.classList.toggle('active', on);
+  });
+  document.querySelectorAll('[data-wish-pdp]').forEach(btn => {
+    btn.classList.toggle('active', wishlist.includes(Number(btn.dataset.wishPdp)));
+  });
+}
+
+function toggleWish(id) {
+  id = Number(id);
+  const idx = wishlist.indexOf(id);
+  if (idx > -1) { wishlist.splice(idx, 1); showToast('Removed from wishlist'); }
+  else { wishlist.push(id); showToast('♥ Added to wishlist'); }
+  storageSet('aiaWish', wishlist);
+  updateWishUI();
+  renderWishlist();
+}
+
+function renderWishlist() {
+  const grid = document.getElementById('wishGrid');
+  if (!grid) return;
+  const empty = document.getElementById('wishEmpty');
+  const countEl = document.getElementById('wishCountText');
+  if (productsLoadError) {
+    grid.innerHTML = '<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--gray);">Unable to load products right now. Please try again later.</div>';
+    return;
+  }
+  const items = wishlist.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
+  if (countEl) countEl.textContent = `${items.length} saved item${items.length === 1 ? '' : 's'}`;
+  if (empty) empty.style.display = items.length ? 'none' : 'block';
+  grid.innerHTML = items.map(renderProductCard).join('');
 }
 
 // ─── RENDER PRODUCT CARD ─────────────────────
@@ -276,7 +324,7 @@ function renderProductCard(p) {
     <div class="prod-img-wrap${hasGallery ? ' has-gallery' : ''}" onmouseenter="prodHoverStart(this)" onmouseleave="prodHoverStop(this)">
       <a href="product.php?id=${p.id}">
         <div class="prod-gallery">
-          ${gallery.map((src, i) => `<img src="${imgUrl(src)}" alt="${p.name}" loading="lazy" class="${i === 0 ? 'active' : ''}" onerror="handleImgError(this)"/>`).join('')}
+          ${gallery.map((src, i) => `<img src="${imgUrl(src)}" alt="${p.name}" loading="lazy" decoding="async" class="${i === 0 ? 'active' : ''}" onerror="handleImgError(this)"/>`).join('')}
         </div>
       </a>
       <div class="prod-badges">
@@ -299,7 +347,7 @@ function renderProductCard(p) {
         <span class="prod-price">Rs. ${p.price.toLocaleString('en-IN')}</span>
         ${off > 0 ? `<span class="prod-orig">Rs. ${p.orig.toLocaleString('en-IN')}</span>` : ''}
       </div>
-      <button class="add-cart-btn" ${outOfStock ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="addToCart({id:${p.id}, name:'${p.name.replace(/'/g,"\\'")}', price:${p.price}, img:'${p.img}', cat:'${p.cat}'})"`}>${outOfStock ? 'OUT OF STOCK' : 'ADD TO CART'}</button>
+      <button class="add-cart-btn" ${outOfStock ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="addToCartById(${p.id})"`}>${outOfStock ? 'OUT OF STOCK' : 'ADD TO CART'}</button>
     </div>
   </div>`;
 }
@@ -373,14 +421,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   // Init
   updateCartUI();
+  updateWishUI();
   const loadingHtml = '<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--gray);">Loading products…</div>';
   const bestGrid = document.getElementById('bestSellerGrid');
   const shopGrid = document.getElementById('shopGrid');
+  const wishGrid = document.getElementById('wishGrid');
+  if (wishGrid) wishGrid.innerHTML = loadingHtml;
   if (bestGrid) bestGrid.innerHTML = loadingHtml;
   if (shopGrid) shopGrid.innerHTML = loadingHtml;
   await fetchProducts();
   renderBestSellers();
   renderShop();
+  renderWishlist();
+  updateWishUI();
   checkAuthState();
   loadBannerMessages();
   loadPopupBanner();
