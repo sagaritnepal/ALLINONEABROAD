@@ -31,7 +31,7 @@ function connectDb(): mysqli
 
 // Bump this whenever product images are re-uploaded, to bypass Hostinger's
 // CDN caching a stale response (e.g. a 404 from before an image was uploaded).
-const IMG_ASSET_VERSION = 4;
+const IMG_ASSET_VERSION = 5;
 
 function imgUrl(string $path): string
 {

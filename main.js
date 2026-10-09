@@ -24,7 +24,7 @@ function handleImgError(img) {
 
 // Bump alongside IMG_ASSET_VERSION in config.php whenever product images are
 // re-uploaded, to bypass Hostinger's CDN caching a stale (e.g. 404) response.
-const IMG_ASSET_VERSION = 4;
+const IMG_ASSET_VERSION = 5;
 function imgUrl(path) {
   if (!path) return path;
   const sep = path.includes('?') ? '&' : '?';
@@ -94,20 +94,20 @@ async function loadPopupBanner() {
 function showPopupBanner(image, link) {
   const overlay = document.createElement('div');
   overlay.id = 'popupBannerOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.className = 'popup-overlay';
 
   const card = document.createElement('div');
-  card.style.cssText = 'position:relative;max-width:480px;width:100%;';
+  card.className = 'popup-card';
 
   const closeBtn = document.createElement('button');
   closeBtn.textContent = '×';
   closeBtn.setAttribute('aria-label', 'Close');
-  closeBtn.style.cssText = 'position:absolute;top:-14px;right:-14px;width:32px;height:32px;border-radius:50%;background:#111827;color:#fff;border:none;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+  closeBtn.className = 'popup-close';
 
   const img = document.createElement('img');
   img.src = image;
   img.alt = 'Promotion';
-  img.style.cssText = 'max-width:100%;max-height:80vh;border-radius:16px;display:block;width:100%;';
+  img.className = 'popup-img';
   img.onerror = () => handleImgError(img);
 
   let mediaEl = img;
@@ -213,11 +213,51 @@ function toggleCart() {
   if (!drawer) return;
   drawer.classList.toggle('open');
   overlay.classList.toggle('open');
-  if (drawer.classList.contains('open')) { renderCartItems(); document.body.style.overflow = 'hidden'; }
-  else { document.body.style.overflow = ''; }
+  if (drawer.classList.contains('open')) {
+    renderCartItems(); document.body.style.overflow = 'hidden';
+    lastFocus = document.activeElement;
+    drawer.querySelector('.drawer-close')?.focus();
+  } else {
+    document.body.style.overflow = '';
+    lastFocus?.focus?.();
+  }
+}
+let lastFocus = null;
+document.addEventListener('keydown', e => {
+  const drawer = document.getElementById('cartDrawer');
+  const sheet = document.getElementById('shopSidebar');
+  const cartOpen = drawer?.classList.contains('open');
+  const sheetOpen = sheet?.classList.contains('open');
+  if (e.key === 'Escape') {
+    if (cartOpen) toggleCart();
+    else if (sheetOpen) toggleFilters();
+    return;
+  }
+  const panel = cartOpen ? drawer : sheetOpen ? sheet : null;
+  if (e.key !== 'Tab' || !panel) return;
+  const f = [...panel.querySelectorAll('a[href], button:not([disabled]), input, select, [tabindex]:not([tabindex="-1"])')].filter(el => el.offsetParent !== null);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
+function toggleFilters() {
+  const sb = document.getElementById('shopSidebar');
+  if (!sb) return;
+  const open = sb.classList.toggle('open');
+  document.getElementById('drawerOverlay')?.classList.toggle('open', open);
+  document.body.style.overflow = open ? 'hidden' : '';
+  if (open) sb.querySelector('.drawer-close')?.focus();
+}
+
+function clearFilters() {
+  document.querySelectorAll('#shopSidebar input[type="checkbox"]').forEach(i => i.checked = false);
+  renderShop();
 }
 
 function closeAllDrawers() {
+  document.getElementById('shopSidebar')?.classList.remove('open');
   document.getElementById('cartDrawer')?.classList.remove('open');
   document.getElementById('drawerOverlay')?.classList.remove('open');
   document.body.style.overflow = '';
@@ -225,7 +265,8 @@ function closeAllDrawers() {
 
 // ─── MOBILE MENU ────────────────────────────
 function toggleMobileMenu() {
-  document.getElementById('mobileNav')?.classList.toggle('open');
+  const open = document.getElementById('mobileNav')?.classList.toggle('open');
+  document.getElementById('mobileMenuBtn')?.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 
 // ─── TOAST ──────────────────────────────────
@@ -249,9 +290,13 @@ function updateWishUI() {
     const on = wishlist.includes(Number(btn.dataset.wish));
     btn.textContent = on ? '♥' : '♡';
     btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', on);
+    btn.setAttribute('aria-label', on ? 'Remove from wishlist' : 'Add to wishlist');
   });
   document.querySelectorAll('[data-wish-pdp]').forEach(btn => {
-    btn.classList.toggle('active', wishlist.includes(Number(btn.dataset.wishPdp)));
+    const on = wishlist.includes(Number(btn.dataset.wishPdp));
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', on);
   });
 }
 
@@ -271,7 +316,7 @@ function renderWishlist() {
   const empty = document.getElementById('wishEmpty');
   const countEl = document.getElementById('wishCountText');
   if (productsLoadError) {
-    grid.innerHTML = '<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--gray);">Unable to load products right now. Please try again later.</div>';
+    grid.innerHTML = '<div class="grid-msg">Unable to load products right now. Please try again later.</div>';
     return;
   }
   const items = wishlist.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
@@ -330,14 +375,14 @@ function renderProductCard(p) {
       <div class="prod-badges">
         ${off > 0 ? `<span class="badge badge-off">${off}% OFF</span>` : ''}
         ${p.badge ? `<span class="badge badge-tag">${p.badge}</span>` : ''}
-        ${outOfStock ? `<span class="badge" style="background:#6b7280;color:#fff;">OUT OF STOCK</span>` : ''}
+        ${outOfStock ? `<span class="badge badge-oos">OUT OF STOCK</span>` : ''}
       </div>
-      <button class="wish-btn ${inWish ? 'active' : ''}" data-wish="${p.id}" onclick="toggleWish(${p.id})" title="Wishlist">${inWish ? '♥' : '♡'}</button>
+      <button class="wish-btn ${inWish ? 'active' : ''}" data-wish="${p.id}" onclick="toggleWish(${p.id})" title="Wishlist" aria-label="${inWish ? 'Remove from wishlist' : 'Add to wishlist'}" aria-pressed="${inWish}">${inWish ? '♥' : '♡'}</button>
       ${hasGallery ? `<div class="prod-dots">${gallery.map((_, i) => `<button type="button" class="prod-dot${i === 0 ? ' active' : ''}" onmouseenter="prodGoTo(this,${i})" onclick="prodGoTo(this,${i})" aria-label="Show photo ${i + 1}"></button>`).join('')}</div>` : ''}
     </div>
     <div class="prod-body">
       <div class="prod-cat">${p.cat.toUpperCase()}${p.pieceType === 'set' ? ' · <span class="type-tag type-tag-set">FULL SET</span>' : p.pieceType === 'single' ? ' · <span class="type-tag type-tag-single">SINGLE PIECE</span>' : ''}</div>
-      <a href="product.php?id=${p.id}" style="color:inherit;text-decoration:none;"><div class="prod-name">${p.name}</div></a>
+      <a href="product.php?id=${p.id}" class="prod-link"><div class="prod-name">${p.name}</div></a>
       <div class="prod-sub">${p.sub || ''}</div>
       <div class="prod-rating">
         <span class="stars">${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}</span>
@@ -347,7 +392,7 @@ function renderProductCard(p) {
         <span class="prod-price">Rs. ${p.price.toLocaleString('en-IN')}</span>
         ${off > 0 ? `<span class="prod-orig">Rs. ${p.orig.toLocaleString('en-IN')}</span>` : ''}
       </div>
-      <button class="add-cart-btn" ${outOfStock ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="addToCartById(${p.id})"`}>${outOfStock ? 'OUT OF STOCK' : 'ADD TO CART'}</button>
+      <button class="add-cart-btn" ${outOfStock ? 'disabled' : `onclick="addToCartById(${p.id})"`}>${outOfStock ? 'OUT OF STOCK' : 'ADD TO CART'}</button>
     </div>
   </div>`;
 }
@@ -356,21 +401,28 @@ function renderProductCard(p) {
 function renderBestSellers() {
   const grid = document.getElementById('bestSellerGrid');
   if (!grid) return;
-  if (productsLoadError) { grid.innerHTML = '<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--gray);">Unable to load products right now.</div>'; return; }
+  if (productsLoadError) { grid.innerHTML = '<div class="grid-msg">Unable to load products right now.</div>'; return; }
   const top4 = [...PRODUCTS].sort((a, b) => (b.reviews ?? 0) - (a.reviews ?? 0)).slice(0, 4);
-  grid.innerHTML = top4.map(renderProductCard).join('') || '<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--gray);">No products yet.</div>';
+  grid.innerHTML = top4.map(renderProductCard).join('') || '<div class="grid-msg">No products yet.</div>';
 }
 
 // ─── SHOP PAGE ───────────────────────────────
 function renderShop() {
   const grid = document.getElementById('shopGrid');
   if (!grid) return;
-  if (productsLoadError) { grid.innerHTML = '<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--gray);">Unable to load products right now. Please try again later.</div>'; return; }
+  if (productsLoadError) { grid.innerHTML = '<div class="grid-msg">Unable to load products right now. Please try again later.</div>'; return; }
   const params = new URLSearchParams(window.location.search);
   const cat = params.get('cat') || 'all';
   const q = (params.get('q') || '').trim().toLowerCase();
   const sort = document.getElementById('sortSelect')?.value || 'featured';
   let prods = cat === 'all' ? [...PRODUCTS] : PRODUCTS.filter(p => p.cat === cat);
+  const ranges = [...document.querySelectorAll('input[data-price]:checked')].map(i => i.dataset.price.split('-').map(Number));
+  if (ranges.length) prods = prods.filter(p => ranges.some(([lo, hi]) => p.price >= lo && p.price < hi));
+  const minOff = Math.max(0, ...[...document.querySelectorAll('input[data-disc]:checked')].map(i => Number(i.dataset.disc)));
+  if (minOff) prods = prods.filter(p => p.orig && p.orig > p.price && Math.round((p.orig - p.price) / p.orig * 100) >= minOff);
+  const nFilters = ranges.length + (minOff ? 1 : 0);
+  const badge = document.getElementById('filterBadge');
+  if (badge) badge.textContent = nFilters ? `(${nFilters})` : '';
   if (q) prods = prods.filter(p => p.name.toLowerCase().includes(q) || (p.sub || '').toLowerCase().includes(q));
   if (sort === 'low') prods.sort((a, b) => a.price - b.price);
   else if (sort === 'high') prods.sort((a, b) => b.price - a.price);
@@ -387,7 +439,7 @@ function renderShop() {
   if (titleEl) titleEl.textContent = q ? `Search results for "${q}"` : (catMap[cat]?.t || 'All Products');
   if (descEl) descEl.textContent = catMap[cat]?.d || '';
   if (countEl) countEl.textContent = `${prods.length} products`;
-  grid.innerHTML = prods.map(renderProductCard).join('') || '<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--gray);">No products found.</div>';
+  grid.innerHTML = prods.map(renderProductCard).join('') || '<div class="grid-msg">No products found.</div>';
 
   // Active filter highlight
   document.querySelectorAll('[data-cat]').forEach(btn => {
@@ -422,7 +474,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Init
   updateCartUI();
   updateWishUI();
-  const loadingHtml = '<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--gray);">Loading products…</div>';
+  const loadingHtml = '<div class="grid-msg">Loading products…</div>';
   const bestGrid = document.getElementById('bestSellerGrid');
   const shopGrid = document.getElementById('shopGrid');
   const wishGrid = document.getElementById('wishGrid');
