@@ -6,13 +6,27 @@
 // as before. Only rows that carry an app_id belong to the app: products added here by hand (products.php, CSV)
 // are never changed or removed, and an app item whose name is already taken by one of those is skipped.
 //
-// Needs SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_OWNER_ID in config.local.php (see
-// config.local.php.example). Without them this does nothing and the shop works as it always did.
+// It needs nothing in config.local.php: the three values below are the app's PUBLIC ones (the anon key is the
+// public one every visitor of the app already has; the feed it opens is read-only and returns only the items that
+// are switched on). config.local.php can still override any of them, e.g. putenv('SUPABASE_OWNER_ID=...').
+//
+// Open /app_sync.php?check=1 in a browser to run one sync and see how it went.
 
 const APP_CATEGORIES = ['luggage', 'kitchen', 'appliances'];
 
-/** The items the app has switched on for the website, or null if it could not be read. */
-function fetchAppProducts(string $baseUrl, string $anonKey, string $ownerId): ?array
+const APP_DEFAULT_URL = 'https://boiiqzkkbyzqkqsxuzyp.supabase.co';
+const APP_DEFAULT_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJvaWlxemtrYnl6cWtxc3h1enlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA4Mzc3MjMsImV4cCI6MjEwNjQxMzcyM30.K-NKzPpIiIIymRvSwKNFHDxgAk9LLwCVHjYi8vQWiHA';
+const APP_DEFAULT_OWNER_ID = '664018d3-d517-4ac3-b2fa-0d8589d23c5c';
+
+/** One setting: the value put in config.local.php if there is one, else the app's public default. */
+function appSetting(string $name, string $default): string
+{
+    $value = getenv($name);
+    return ($value !== false && $value !== '') ? (string)$value : $default;
+}
+
+/** The items the app has switched on for the website. On failure null, and $status says why in one word. */
+function fetchAppProducts(string $baseUrl, string $anonKey, string $ownerId, string &$status): ?array
 {
     $ch = curl_init($baseUrl . '/rest/v1/rpc/website_products');
     curl_setopt_array($ch, [
@@ -24,18 +38,21 @@ function fetchAppProducts(string $baseUrl, string $anonKey, string $ownerId): ?a
         CURLOPT_TIMEOUT => 5,
     ]);
     $body = curl_exec($ch);
-    $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    if ($body === false || $status !== 200) {
-        error_log('app_sync: could not read the app (HTTP ' . $status . ')');
+    if ($body === false || $code !== 200) {
+        error_log('app_sync: could not read the app (HTTP ' . $code . ')');
+        $status = 'app-unreachable-http-' . $code;
         return null;
     }
     $rows = json_decode($body, true);
     // A list of items (an empty list is a real answer: nothing is switched on), never an error object.
     if (!is_array($rows) || ($rows !== [] && !isset($rows[0]))) {
+        $status = 'app-bad-answer';
         return null;
     }
+    $status = 'ok';
     return array_values(array_filter($rows, 'is_array'));
 }
 
@@ -52,20 +69,22 @@ function ensureAppIdColumn(mysqli $conn): void
  * Brings `products` in line with what the app has switched on: new items are added, changed ones (price, stock,
  * photo, ...) updated, and the ones switched off or deleted in the app removed. Called before the shop's list is
  * read. It never throws; if the app cannot be reached nothing is changed, so the shop shows what it had.
+ * Returns one word for how it went: ok, no-curl, app-unreachable-http-N, app-bad-answer or database-error.
  */
-function syncAppProducts(mysqli $conn): void
+function syncAppProducts(mysqli $conn): string
 {
-    $baseUrl = rtrim((string)getenv('SUPABASE_URL'), '/');
-    $anonKey = (string)getenv('SUPABASE_ANON_KEY');
-    $ownerId = (string)getenv('SUPABASE_OWNER_ID');
-    if ($baseUrl === '' || $anonKey === '' || $ownerId === '' || !function_exists('curl_init')) {
-        return;
+    if (!function_exists('curl_init')) {
+        return 'no-curl';
     }
+    $baseUrl = rtrim(appSetting('SUPABASE_URL', APP_DEFAULT_URL), '/');
+    $anonKey = appSetting('SUPABASE_ANON_KEY', APP_DEFAULT_ANON_KEY);
+    $ownerId = appSetting('SUPABASE_OWNER_ID', APP_DEFAULT_OWNER_ID);
 
     try {
-        $items = fetchAppProducts($baseUrl, $anonKey, $ownerId);
+        $status = '';
+        $items = fetchAppProducts($baseUrl, $anonKey, $ownerId, $status);
         if ($items === null) {
-            return; // not read, so nothing may be removed because of it
+            return $status; // not read, so nothing may be removed because of it
         }
         ensureAppIdColumn($conn);
 
@@ -115,7 +134,32 @@ function syncAppProducts(mysqli $conn): void
         } else {
             $conn->query('DELETE FROM products WHERE app_id IS NOT NULL');
         }
+        return 'ok';
     } catch (Throwable $e) {
         error_log('app_sync: ' . $e->getMessage());
+        return 'database-error';
     }
+}
+
+// Opened on its own as /app_sync.php?check=1 (not when api.php includes it): runs one sync and says how it went,
+// in one word and a count - no details and nothing secret.
+if (isset($_GET['check']) && realpath(__FILE__) === realpath((string)($_SERVER['SCRIPT_FILENAME'] ?? ''))) {
+    require_once __DIR__ . '/config.php';
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    try {
+        $conn = connectDb();
+        $result = syncAppProducts($conn);
+        $count = null;
+        try {
+            $row = $conn->query('SELECT COUNT(*) AS n FROM products WHERE app_id IS NOT NULL');
+            $count = $row ? (int)$row->fetch_assoc()['n'] : null;
+        } catch (Throwable $e) {
+            // the app_id column does not exist (yet): the count stays unknown
+        }
+        echo json_encode(['sync' => $result, 'items_from_app_in_shop' => $count]);
+    } catch (Throwable $e) {
+        echo json_encode(['sync' => 'shop-database-unreachable']);
+    }
+    exit;
 }
