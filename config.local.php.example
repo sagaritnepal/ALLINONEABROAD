@@ -12,3 +12,12 @@ putenv('DB_PASS=your-password-here');
 // Protects orders.php (customer PII) behind a login form. Pick a long,
 // random passphrase — this page is publicly reachable if unset/guessed.
 putenv('ADMIN_PASSWORD=choose-a-long-random-passphrase');
+
+// Items switched on in the Finance Nepal app (Stock and Inventory > "Show on website") appear in the shop.
+// SUPABASE_URL and SUPABASE_ANON_KEY: Supabase dashboard > Project Settings > API (the anon key is the public one).
+// SUPABASE_OWNER_ID: the company's id. In the Supabase SQL editor run:
+//   select id from profiles where business_name ilike '%all in one abroad%';
+// Leave these out and the shop works as before, with only the products added here.
+putenv('SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co');
+putenv('SUPABASE_ANON_KEY=your-anon-public-key');
+putenv('SUPABASE_OWNER_ID=00000000-0000-0000-0000-000000000000');

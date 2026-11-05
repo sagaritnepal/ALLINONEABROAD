@@ -69,6 +69,10 @@ try {
     }
 
     if ($action === 'products') {
+        // Items switched on in the Finance Nepal app (Stock and Inventory) are brought in first.
+        require_once __DIR__ . '/app_sync.php';
+        syncAppProducts($conn);
+
         $result = $conn->query('SELECT id, name, category, price, original_price, stock, image, images, description, badge, rating, reviews, piece_type FROM products ORDER BY id ASC');
         $products = [];
         while ($row = $result->fetch_assoc()) {
