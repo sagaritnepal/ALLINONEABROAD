@@ -525,3 +525,43 @@ async function handleLogout() {
   } catch (err) {}
   window.location.href = '/';
 }
+
+// ─── VISIT COUNTER ───────────────────────────
+// Tells the Finance Nepal app that a page was opened (Marketing > Visits there). The three values are the app's public
+// ones - the same ones app_sync.php carries - and record_visit only ever adds one row to that company's visit list.
+// Nothing personal is sent: a random id kept in this browser, the page, the site the visitor came from, and phone or computer.
+(function trackVisit() {
+  try {
+    if (/^(localhost|127\.|\[::1\])/.test(location.hostname)) return;
+    var APP = {
+      url: 'https://boiiqzkkbyzqkqsxuzyp.supabase.co',
+      key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJvaWlxemtrYnl6cWtxc3h1enlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA4Mzc3MjMsImV4cCI6MjEwNjQxMzcyM30.K-NKzPpIiIIymRvSwKNFHDxgAk9LLwCVHjYi8vQWiHA',
+      owner: '664018d3-d517-4ac3-b2fa-0d8589d23c5c'
+    };
+    var visitor = 'unknown';
+    try {
+      visitor = localStorage.getItem('aio_visitor');
+      if (!visitor) {
+        visitor = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
+        localStorage.setItem('aio_visitor', visitor);
+      }
+    } catch (e) { visitor = visitor || 'unknown'; }
+    var ua = navigator.userAgent || '';
+    var device = /iPad|Tablet/i.test(ua) ? 'tablet' : /Mobi|Android|iPhone/i.test(ua) ? 'mobile' : 'desktop';
+    var referrer = '';
+    try {
+      if (document.referrer) {
+        var host = new URL(document.referrer).hostname;
+        if (host && host !== location.hostname) referrer = host.replace(/^www\./, '');
+      }
+    } catch (e) {}
+    // A product page is counted per product ("product.php?id=7"), so the busiest products show up too.
+    var path = location.pathname + (/product\.php$/.test(location.pathname) ? location.search : '');
+    fetch(APP.url + '/rest/v1/rpc/record_visit', {
+      method: 'POST',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json', apikey: APP.key, Authorization: 'Bearer ' + APP.key },
+      body: JSON.stringify({ p_owner: APP.owner, p_visitor: visitor, p_path: path, p_referrer: referrer, p_device: device })
+    }).catch(function () {});
+  } catch (e) {}
+})();
